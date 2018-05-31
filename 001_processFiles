@@ -1,0 +1,413 @@
+#!/bin/ksh
+
+# MAKE SURE INPUT FILES DO NOT HAVE LABELS AT THE FIRST LINE
+
+
+
+#
+# Params:  CMDS FNIRS output_directory
+#
+function processFiles {
+	if (( $# != 3 )); then 
+		print "[ERROR] Expected 3 arguments, got $#" >&2
+		exit
+	fi
+
+	mkdir -p $3	# make parent dir too, if exists then no error.
+
+	gawk -v cmds="$1" -v fnirs="$2" -vODIR=$3 '
+
+	k=0;
+	function getNextEntry() {
+		return A[k++]
+	}
+
+	b=0
+	function getNextEntryBREAK() {
+		return B[b++]
+	}
+	function RESET_BREAK() {
+		b=0;
+	}
+
+	function RESET() {
+		k=0;
+	}
+
+	function constructFileName(   _a, _b) {
+		return sprintf("%s/OUT_%s_%s", ODIR, _a, _b);
+	}
+
+	function constructFileNameBREAK(   _a, _b) {
+		return sprintf("%s/BREAK_%s_%s", ODIR, _a, _b);
+	}
+
+	BEGIN {
+		i=0;
+		START="";
+		while (( getline line < cmds ) > 0 ) {
+			if( index(line, "timeReceived,") != 0 )
+				continue;	# skip header
+
+			if( index(line, ",TRAINING_START,") != 0 ) {
+				split(line,aa, ",");
+				START=aa[1];
+			}
+			else if( index(line, ",TRAINING_END,") != 0 ) {
+				split(line,aa, ",");
+				A[i++] = sprintf("%s,%s,%s", START, aa[1], aa[6]);
+			}
+		}
+		RESET(); # so we can call getNextEntry() from the begining
+		close(cmds);  # need to close it so we can re-open it and read from it.
+
+
+		##########
+		i=0;
+		START="";
+		while (( getline line < cmds ) > 0 ) {
+			if( index(line, "timeReceived,") != 0 )
+				continue;	# skip header
+
+			if( index(line, ",BREAK_START,") != 0 ) {
+				split(line,aa, ",");
+				START=aa[1];
+			}
+			else if( index(line, ",BREAK_END,") != 0 ) {
+				split(line,aa, ",");
+				B[i++] = sprintf("%s,%s,%s", START, aa[1], aa[6]);
+			}
+		}
+		RESET_BREAK(); # so we can call getNextEntry() from the begining
+		##########
+
+
+		close(cmds);  # need to close it so we can re-open it and read from it.
+		while (( getline line < cmds ) > 0 ) {
+			if( index(line, ",BASELINE_START,") != 0 ) {
+				split(line,aa, ",");
+				START=aa[1];
+			}
+			else if( index(line, ",BASELINE_END,") != 0 ) {
+				split(line,aa, ",");
+				#BASELINE_LINE = sprintf("%s,%s,%s", START, aa[1], aa[6]); 
+
+				SB = START;
+				SE = aa[1];
+				FILE_OUT=constructFileName("_", "BASELINE");
+#print FILE_OUT > "/dev/stderr"
+
+				while (( getline line < fnirs) > 0 ) {
+					if( index(line, "timeReceived,") != 0 )
+						continue;	# skip header
+
+					split(line,ELEMENTS, ",");
+					if( SB <= ELEMENTS[1] && SE >= ELEMENTS[1] ) {
+						printf("%s\n", line) >> FILE_OUT; 
+					}
+					else if( SB > ELEMENTS[1] ) {
+						continue;
+					}
+					else if( SE < ELEMENTS[1] ) {
+
+#printf("BREAK %s < %s\n", SE, ELEMENTS[1])  > "/dev/stderr"
+						break;
+					}
+				}
+#print FILE_OUT > "/dev/stderr"
+				close(fnirs);
+
+
+				break;
+			}
+		}
+		##########
+		ENT=getNextEntryBREAK();
+		split(ENT, ar, ",");
+		SS=ar[1]
+		EE=ar[2]
+		LL=ar[3]
+		CCC=0;
+		FILE_OUT=constructFileNameBREAK(CCC, LL);
+		while (( getline line < fnirs) > 0 ) {
+			if( index(line, "timeReceived,") != 0 )
+				continue;	# skip header
+
+			split(line,ELEMENTS, ",");
+			if( SS <= ELEMENTS[1] && EE >= ELEMENTS[1] ) {
+				printf("%s\n", line) >> FILE_OUT; 
+			}
+			else if( SS > ELEMENTS[1] ) {
+				continue;
+			}
+			else if( EE < ELEMENTS[1] ) {
+				ENT=getNextEntryBREAK();
+				split(ENT, ar, ",");
+				SS=ar[1]
+				EE=ar[2]
+				LL=ar[3]
+				CCC++;
+				FILE_OUT=constructFileNameBREAK(CCC, LL);
+			}
+		}
+		close(fnirs);
+		##########
+	} 
+
+
+	{ 
+		ENT=getNextEntry();
+		split(ENT, ar, ",");
+		SS=ar[1]
+		EE=ar[2]
+		LL=ar[3]
+		CCC=0;
+		FILE_OUT=constructFileName(CCC, LL);
+		while (( getline line ) > 0 ) {
+			if( index(line, "timeReceived,") != 0 )
+				continue;	# skip header
+
+			split(line,ELEMENTS, ",");
+			if( SS <= ELEMENTS[1] && EE >= ELEMENTS[1] ) {
+				printf("%s\n", line) >> FILE_OUT; 
+			}
+			else if( SS > ELEMENTS[1] ) {
+				continue;
+			}
+			else if( EE < ELEMENTS[1] ) {
+				ENT=getNextEntry();
+				split(ENT, ar, ",");
+				SS=ar[1]
+				EE=ar[2]
+				LL=ar[3]
+				CCC++;
+				FILE_OUT=constructFileName(CCC, LL);
+			}
+		}
+	} 
+
+	END { 
+		printf("DONE: %s\n", ODIR);
+	} ' $2
+}
+
+
+###############################################################
+# Splits inputFile file into 2 thirds and 1 third.
+# Each split is half low and half high load.
+#
+# 2/3rds of the dataset for training and 1/3rd 
+# for evaluation, (validation is part of the 2/3rds).
+###############################################################
+function SplitData {
+	if (( $# != 3 )); then
+		print "[ERROR] Expected <inputFile to split>, <TRAIN data filename> and <TEST data filename>." >&2
+		exit
+	fi
+
+	#DIR=$1
+	#FILE="$DIR/CognitiveLoad"
+	FILE=$1
+	TRAIN=$2
+	TEST=$3
+	PP=$$   # pid
+
+	nLines=$(wc -l $FILE | awk '{ print $1 }' )
+	half=$((nLines/2))
+
+	head -$half $FILE > /tmp/H_$PP		# all the low load
+	tail -$half $FILE > /tmp/T_$PP		# all the high load
+
+	third=$((half/3))
+	two_thirds=$((third*2))
+
+	head -$two_thirds /tmp/H_$PP	 > $TRAIN
+	head -$two_thirds /tmp/T_$PP	>> $TRAIN
+
+	tail -$third      /tmp/H_$PP	 > $TEST
+	tail -$third      /tmp/T_$PP    >> $TEST
+
+	/bin/rm -f /tmp/H_$PP
+	/bin/rm -f /tmp/T_$PP
+}
+
+####################################################################################################
+# Delete any intermediate files not needed.
+####################################################################################################
+function doCleanUp  {
+	if (( $# != 1 )); then 
+		print "[ERROR] Expected 1 argument <directory of OUT>, got $# arguments" >&2
+		exit
+	fi
+
+	/bin/rm -f $1/Cognitive* $1/BREAK_* $1/OUT_*[0-9]
+}
+
+####################################################################################################
+# Randomize lines in file (Shuffle the lines)
+####################################################################################################
+function unsort {
+        if (( $# != 1 )); then
+                print "[ERROR] Expected 1 argument (file to unsort), got $#" >&2
+                exit
+        fi
+
+        gawk '
+          BEGIN {
+                FS = "\n";
+                srand();
+          }
+
+          {
+                lines[ rand()] = $0;
+          }
+          END {
+                for( k in lines ){
+                        print lines[k];
+                }
+        }' $1
+}
+
+
+####################################################################################################
+# The easy and difficult parameters tell us what value is easy and difficult for that expediment.
+# Sometimes 1 is easy and 2 difficult (true for the n-back experiment)
+####################################################################################################
+function KerasFix {
+	if (( $# != 3 )); then 
+		print "[ERROR] Expected 3 arguments <directory> <easy> <difficult>, got $# arguments" >&2
+		exit
+	fi
+
+	#
+	# We will throw away the first half of the dataset (using only the last half of each
+	# experiment
+	#
+	#set -A arrE $(ls -1 $1/OUT*$2)
+	#set -A arrD $(ls -1 $1/OUT*$3)
+	#mv ${arrE[5]} $1/LEON_Et
+	#mv ${arrD[5]} $1/LEON_Dt
+	#awk '{printf("%s,0\n", $0)}' $1/LEON_Et > $1/LEON_E
+	#awk '{printf("%s,1\n", $0)}' $1/LEON_Dt > $1/LEON_D
+	#/bin/rm -f $1/LEON_Et $1/LEON_Dt
+
+	HalfNumOfLines=$((  $(wc -l    $(ls $1/OUT* | head -1)    |    awk '{ print $1 }')   / 2))
+	tail -$HalfNumOfLines -q $1/*_$2 > /tmp/E
+	tail -$HalfNumOfLines -q $1/*_$3 > /tmp/D
+
+	awk '{printf("%s,0\n", $0)}' /tmp/E > /tmp/EL
+	awk '{printf("%s,1\n", $0)}' /tmp/D > /tmp/DL
+
+	#
+	# ** Now SHUFFLE the data **
+	#
+	#unsort /tmp/EL > /tmp/EL_unsorted
+	#unsort /tmp/DL > /tmp/DL_unsorted
+
+	cat /tmp/EL /tmp/DL > $1/CognitiveLoad
+	#cat /tmp/EL_unsorted /tmp/DL_unsorted > $1/CognitiveLoad
+	/bin/rm -f /tmp/EL /tmp/DL /tmp/E /tmp/D /tmp/EL_unsorted /tmp/DL_unsorted
+
+	# Now split the data 
+	SplitData $1/CognitiveLoad  $1/TRAIN_DATA  $1/TEST_DATA 	
+
+
+
+	#   I DONT DO ANY MORE   ** UNSORTING / SHUFFLED **
+
+	#
+	# Now lets simply use the entire dataset - do NOT throw away the first half of
+	# each experiment.
+	#
+	cat $1/*_$2 > /tmp/E
+	cat $1/*_$3 > /tmp/D
+
+	awk '{printf("%s,0\n", $0)}' /tmp/E > /tmp/EL
+	awk '{printf("%s,1\n", $0)}' /tmp/D > /tmp/DL
+
+	cat /tmp/EL /tmp/DL > $1/CognitiveLoad_ENTIRE_DATASET
+	/bin/rm -f /tmp/EL /tmp/DL /tmp/E /tmp/D
+
+	# Now split the data 
+	SplitData $1/CognitiveLoad_ENTIRE_DATASET  $1/TRAIN_DATA_ENTIRE_DATASET  $1/TEST_DATA_ENTIRE_DATASET 	
+
+
+
+	####################################################
+	# Now create a single file of all the BREAKs
+	# and put 0 at the end for the Load
+	# a) one files contains ALL breaks and 
+	# b) another file contains only the send half
+	####################################################
+	cat $1/BREAK_* | gawk -v LOW="$2" '{ printf("%s,%s\n", $0, LOW)}' > $1/ALL_BREAKS
+
+	HalfNumOfLines=$((  $(wc -l    $(ls $1/BREAK_* | head -1)    |    awk '{ print $1 }')   / 2))
+	tail -$HalfNumOfLines -q $1/BREAK_*  |  gawk -v LOW="$2" '{ printf("%s,%s\n", $0, LOW)}' > $1/HALF_BREAKS
+
+
+	####################################################
+	# remove any intermediate files.
+	####################################################
+	doCleanUp $1
+
+}
+
+
+print 
+print "---------------------------------------------------------"
+print "Tool Version: 1.8, (May. 4 2018)"
+print "Processing the DATA directory, output directory is OUT"
+print "---------------------------------------------------------"
+print 
+
+D="./DATA/"
+
+/bin/rm -fr OUT/*
+
+
+#processFiles "$D/p11/raw_command.csv" "$D/p11/raw_fnirs.csv" "OUT/p11"   # bad
+processFiles "$D/p12/raw_command.csv" "$D/p12/raw_fnirs.csv" "OUT/p12"
+processFiles "$D/p13/raw_command.csv" "$D/p13/raw_fnirs.csv" "OUT/p13"
+processFiles "$D/p14/raw_command.csv" "$D/p14/raw_fnirs.csv" "OUT/p14"
+processFiles "$D/p15/raw_command.csv" "$D/p15/raw_fnirs.csv" "OUT/p15"
+processFiles "$D/p16/raw_command.csv" "$D/p16/raw_fnirs.csv" "OUT/p16"
+processFiles "$D/p17/raw_command.csv" "$D/p17/raw_fnirs.csv" "OUT/p17"
+processFiles "$D/p18/raw_command.csv" "$D/p18/raw_fnirs.csv" "OUT/p18"
+
+processFiles "$D/p19/raw_command.csv" "$D/p19/raw_fnirs.csv" "OUT/p19"
+processFiles "$D/p20/raw_command.csv" "$D/p20/raw_fnirs.csv" "OUT/p20"
+processFiles "$D/p21/raw_command.csv" "$D/p21/raw_fnirs.csv" "OUT/p21"
+processFiles "$D/p22/raw_command.csv" "$D/p22/raw_fnirs.csv" "OUT/p22"
+processFiles "$D/p23/raw_command.csv" "$D/p23/raw_fnirs.csv" "OUT/p23"
+#processFiles "$D/p24/raw_command.csv" "$D/p24/raw_fnirs.csv" "OUT/p24"   # bad (interesting)
+processFiles "$D/p25/raw_command.csv" "$D/p25/raw_fnirs.csv" "OUT/p25"
+#processFiles "$D/p26/raw_command.csv" "$D/p26/raw_fnirs.csv" "OUT/p26"   # bad
+processFiles "$D/p27/raw_command.csv" "$D/p27/raw_fnirs.csv" "OUT/p27"
+processFiles "$D/p28/raw_command.csv" "$D/p28/raw_fnirs.csv" "OUT/p28"
+processFiles "$D/p29/raw_command.csv" "$D/p29/raw_fnirs.csv" "OUT/p29"
+processFiles "$D/p30/raw_command.csv" "$D/p30/raw_fnirs.csv" "OUT/p30"
+
+
+
+
+#KerasFix "OUT/p11" "0" "2"
+KerasFix "OUT/p12" "0" "2"
+KerasFix "OUT/p13" "0" "2"
+KerasFix "OUT/p14" "0" "2"
+KerasFix "OUT/p15" "0" "2"
+KerasFix "OUT/p16" "0" "2"
+KerasFix "OUT/p17" "0" "2"
+KerasFix "OUT/p18" "0" "2"
+
+KerasFix "OUT/p19" "0" "2"
+KerasFix "OUT/p20" "0" "2"
+KerasFix "OUT/p21" "0" "2"
+KerasFix "OUT/p22" "0" "2"
+KerasFix "OUT/p23" "0" "2"
+#KerasFix "OUT/p24" "0" "2"
+KerasFix "OUT/p25" "0" "2"
+#KerasFix "OUT/p26" "0" "2"
+KerasFix "OUT/p27" "0" "2"
+KerasFix "OUT/p28" "0" "2"
+KerasFix "OUT/p29" "0" "2"
+KerasFix "OUT/p30" "0" "2"
