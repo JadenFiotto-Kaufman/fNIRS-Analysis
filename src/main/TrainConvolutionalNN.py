@@ -27,6 +27,7 @@ model.compile(loss='binary_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
 
+# was having trouble with input shape, now it should be correctly looking at the shape.
 xTrain = numpy.expand_dims(xTrain, axis=2)
 
 model.fit(xTrain, yTrain, batch_size=16, epochs=100)
