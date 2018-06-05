@@ -1,6 +1,8 @@
 from sklearn import preprocessing
 import pandas as pd
+from numpy import random, arange, array
 import os
+from math import floor
 
 class fNIRLib:
     @staticmethod
@@ -28,3 +30,10 @@ class fNIRLib:
         names = list(data.iloc[0])
         scaler = preprocessing.MinMaxScaler(feature_range=(0,1))
         return pd.Series([pd.DataFrame(scaler.fit_transform(y.values), columns=names) for y in data])
+    @staticmethod
+    def to3D(data):
+        return array([x.values for x in data ])
+    @staticmethod
+    def testTrain(features, classes, size=1./3.):
+        test = features.sample(frac=size,random_state=200)
+        return features.drop(test.index), test, classes.drop(test.index), classes.iloc[test.index]
