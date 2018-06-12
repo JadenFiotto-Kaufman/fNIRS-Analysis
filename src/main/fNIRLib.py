@@ -9,7 +9,7 @@ class fNIRLib:
     @staticmethod
     def importData(data_path, combine=False, points=False):
         '''
-        Function to import each subject data 
+        Function to import each subject data
         :param data_path: relative path to /processed/ folder
         :param combine: option to disregard differentiation of subjects and combine into one dataframe (recommended)
         :param points: option to group each task into it's own data frame. This is every 260 time steps (recommended)
