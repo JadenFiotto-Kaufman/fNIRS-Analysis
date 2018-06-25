@@ -33,5 +33,3 @@ checkpoint = ModelCheckpoint(filepath,
                             mode='max')
 #model.load_weights(filepath)
 model.fit(xTrain, yTrain, epochs=10000, batch_size=80,validation_data=(xTest, yTest),callbacks=[checkpoint])
-
-
