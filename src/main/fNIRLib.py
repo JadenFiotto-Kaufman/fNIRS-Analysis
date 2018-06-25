@@ -44,9 +44,9 @@ class fNIRLib:
         :return: Type of |Series(Series(DataFrame(2D)))| shape: (Subjects, Reading/Task, (Time Steps, Features))
         '''
         names = list(data.iloc[0])
-        scaler = preprocessing.MinMaxScaler(feature_range=(0,1))
+        scaler = preprocessing.MinMaxScaler(feature_range=(-1,1))
         scaler = scaler.fit(pd.concat([d for d in data]).values)
-        return pd.Series([pd.DataFrame(scaler.transform(y.values), columns=names) for y in data])
+        return pd.Series([pd.DataFrame(scaler.transform(y), columns=names) for y in data])
     @staticmethod
     def to3D(data):
         '''
@@ -64,6 +64,7 @@ class fNIRLib:
         :param size: Percent of data reserved for testing
         :return: Train features, test features, train classes, test classes
         '''
+        random.seed(48)
         n = features.size
         index = random.sample(range(n), int(size * n))
         return features.drop(index), features.iloc[index], classes.drop(index), classes.iloc[index]

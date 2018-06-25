@@ -18,11 +18,9 @@ xTrain = fNIRLib.to3D(xTrain)
 xTest = fNIRLib.to3D(xTest)
 input_shape = xTrain.shape
 
-print(yTrain.shape)
-print(xTrain.shape)
 
 model = Sequential()
-model.add(Conv1D(64, kernel_size=3, activation='relu', batch_input_shape=(340, 16, 260)))
+model.add(Conv1D(64, kernel_size=3, activation='relu', input_shape=(input_shape[1:])))
 # model.add(Conv2D(64, 2, activation='relu'))
 model.add(MaxPooling1D())
 # model.add(Conv2D(128, 2, activation='relu'))
@@ -33,8 +31,6 @@ model.add(Dense(1, activation='linear'))
 model.compile(loss='binary_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
-
-model.summary()
 
 model.fit(xTrain, yTrain, batch_size=16, epochs=1000)
 
