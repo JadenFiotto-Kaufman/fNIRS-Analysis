@@ -9,13 +9,14 @@ data = fNIRLib.importData("../../processed/", combine=True, points=True)
 features, classes = fNIRLib.xySplit(data.iloc[0])
 scaled = fNIRLib.minMaxScale(features)
 
-xTrain, xTest, yTrain, yTest = fNIRLib.testTrain(features, classes)
+xTrain, xTest, yTrain, yTest = fNIRLib.testTrain(scaled, classes)
 
 yTrain = yTrain.values
 yTest = yTest.values
 
 xTrain = fNIRLib.to3D(xTrain)
 xTest = fNIRLib.to3D(xTest)
+
 input_shape = xTrain.shape
 
 print(input_shape)
@@ -41,4 +42,3 @@ model.fit(xTrain, yTrain, batch_size=16, epochs=500)
 
 scores = model.evaluate(xTrain, yTrain, verbose=0)
 print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
-
