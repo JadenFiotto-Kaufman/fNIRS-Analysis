@@ -1,11 +1,18 @@
 from sklearn import preprocessing
 import pandas as pd
-import random
+from numpy import random
 from numpy import array
 import os
-from math import floor
+from tkinter.filedialog import askopenfilename
 
 class fNIRLib:
+    @staticmethod
+    def importSingleton(filename):
+        names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb",
+                 "b3HbO", "b3Hb", "b4HbO", "b4Hb", "Class"]
+        data = pd.read_csv(filename, usecols=range(4, 21), names=names)
+        data = pd.Series([data.iloc[260 * x:260 * (x + 1), :] for x in range(data.shape[0] // 260)])
+        return data
     @staticmethod
     def importData(data_path, combine=False, points=False):
         '''
@@ -44,8 +51,8 @@ class fNIRLib:
         :return: Type of |Series(Series(DataFrame(2D)))| shape: (Subjects, Reading/Task, (Time Steps, Features))
         '''
         names = list(data.iloc[0])
-        scaler = preprocessing.MinMaxScaler(feature_range=(-1,1))
-        scaler = scaler.fit(pd.concat([d for d in data]).values)
+        scaler = preprocessing.StandardScaler()
+        scaler = scaler.fit(pd.concat([d for d in data]))
         return pd.Series([pd.DataFrame(scaler.transform(y), columns=names) for y in data])
     @staticmethod
     def to3D(data):
@@ -56,7 +63,7 @@ class fNIRLib:
         '''
         return array([x.values for x in data])
     @staticmethod
-    def testTrain(features, classes, size=1./3.):
+    def testTrain(features, classes, size=1./3., seed=7):
         '''
         Divides data into test and train based on percentage reserved for testing
         :param features: Type of |Series(DataFrames(2D))| shape: (Reading/Task, (Time Steps, Features))
@@ -64,7 +71,12 @@ class fNIRLib:
         :param size: Percent of data reserved for testing
         :return: Train features, test features, train classes, test classes
         '''
-        random.seed(48)
-        n = features.size
-        index = random.sample(range(n), int(size * n))
-        return features.drop(index), features.iloc[index], classes.drop(index), classes.iloc[index]
+        random.seed(seed)
+        n = features.shape[0]
+        #n = features.size
+        index = random.rand(n) < size
+        return features[~index], features[index], classes[~index], classes[index]
+
+
+
+
