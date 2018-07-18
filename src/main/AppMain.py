@@ -6,14 +6,20 @@ from PyQt5.QtWidgets import QDialog, QApplication, QVBoxLayout, QHBoxLayout, QLa
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.patches import Rectangle
+from sklearn import feature_extraction
 
 from src.main.fNIRLib import fNIRLib
+from tsfresh import feature_extraction
+import json
 
 
 class Window(QDialog):
 
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
+
+        with open('./features_extracted.json', 'r') as file:
+            self.loaded_json_data = json.load(file)
 
         # a figure instance to plot on
         self.figure = plt.figure()
@@ -73,11 +79,12 @@ class Window(QDialog):
 
     def openFileDialog(self):
         options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        folder_path = QFileDialog.getExistingDirectory(self, caption="Import Processed Data Folder")
-        if folder_path:
-            print(folder_path)
-            data = fNIRLib.importSingleton(folder_path + "/TRAIN_DATA")
+        # options |= QFileDialog.DontUseNativeDialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                   "All Files (*);;Python Files (*.py)", options=options)
+        if file_path:
+            print(file_path)
+            data = fNIRLib.importSingleton(file_path)
 
             data_frames = []
             for df in data:
@@ -91,7 +98,9 @@ class Window(QDialog):
         print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
               ('double' if event.dblclick else 'single', event.button,
                event.x, event.y, event.xdata, event.ydata))
-        self.figure.tight_layout()
+        if (event.button == 1):
+            self.figure.tight_layout()
+            self.ax.patches.clear()
 
         if event.button == 3:
             self.draw_rectangle(event.xdata, event.ydata)
@@ -101,11 +110,20 @@ class Window(QDialog):
             QApplication.processEvents()
             x_point = int(round(event.xdata))
 
-            ml_data = self.features.iloc[x_point]
+            ml_data = self.features.iloc[0:x_point]
+            ml_data['column_id'] = ml_data.shape[0] * [0]
+            ml_data['time_id'] = range(ml_data.shape[0])
+            print(ml_data)
 
-            print(self.model.predict_classes(ml_data))
+            features_extracted = feature_extraction.extract_features(ml_data,
+                                                                     kind_to_fc_parameters=self.loaded_json_data,
+                                                                     column_id="column_id",
+                                                                     column_sort="time_id")
+
+            print(features_extracted)
+
+            print(self.model.predict_classes(features_extracted.values))
         self.canvas.draw()
-
 
     # def on_move(self, event):
     #     # get the x and y pixel coords
@@ -127,9 +145,12 @@ class Window(QDialog):
 
         # create an axis
         self.ax = self.figure.add_subplot(111)
-        self.ax.set_aspect('auto')
+        # self.ax.set_aspect('auto')
 
         self.ax.plot(self.features, '-')
+
+        self.ax.legend(self.ax.get_lines(), self.features.columns, bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+                       ncol=8, mode="expand", borderaxespad=0.)
         self.ax.set_xlim(0, len(self.features))
         self.figure.tight_layout()
 
