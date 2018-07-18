@@ -29,6 +29,8 @@ class fNIRLib:
         data = [[d.iloc[260 * x:260 * (x + 1),:] for x in range(d.shape[0] // 260)] for d in data]
         if combine:
             data = [x for y in data for x in y]
+        else:
+            data = data[0]
         return data
     @staticmethod
     def xySplit(data):
@@ -38,8 +40,8 @@ class fNIRLib:
         :return: Type of |Series(Series(DataFrame(2D)))| shape: (Subjects, Reading/Task, (Time Steps, Features))
         '''
         split_data = [(y.iloc[:,:-1], y.iloc[0,-1]) for y in data]
-        x_data = [y[0] for y in split_data]
-        y_data = [y[1] for y in split_data]
+        x_data = pd.Series([y[0] for y in split_data])
+        y_data = pd.Series([y[1] for y in split_data])
         return x_data, y_data
     @staticmethod
     def minMaxScale(data):
@@ -61,7 +63,7 @@ class fNIRLib:
         '''
         return array([x.values for x in data])
     @staticmethod
-    def testTrain(features, classes, size=1./3., seed=7):
+    def testTrain(features, classes, size=1./3., seed=10):
         '''
         Divides data into test and train based on percentage reserved for testing
         :param features: Type of |Series(DataFrames(2D))| shape: (Reading/Task, (Time Steps, Features))
@@ -71,7 +73,6 @@ class fNIRLib:
         '''
         random.seed(seed)
         n = features.shape[0]
-        #n = features.size
         index = random.rand(n) < size
         return features[~index], features[index], classes[~index], classes[index]
 
