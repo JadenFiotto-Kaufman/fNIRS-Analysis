@@ -3,9 +3,9 @@ import pandas as pd
 from numpy import random
 from numpy import array
 import os
-from tkinter.filedialog import askopenfilename
 
 class fNIRLib:
+    tslength = 260
     @staticmethod
     def importSingleton(filename):
         names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb",
@@ -14,7 +14,7 @@ class fNIRLib:
         data = pd.Series([data.iloc[260 * x:260 * (x + 1), :] for x in range(data.shape[0] // 260)])
         return data
     @staticmethod
-    def importData(data_path, combine=False, points=False):
+    def importData(data_path, combine=False):
         '''
         Function to import each subject data
         :param data_path: relative path to /processed/ folder
@@ -25,12 +25,10 @@ class fNIRLib:
         names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb", "b3HbO", "b3Hb", "b4HbO", "b4Hb", "Class"]
         train = [pd.read_csv(data_path + subject + "/TRAIN_DATA", usecols=range(4,21), names=names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
         test = [pd.read_csv(data_path + subject + "/TEST_DATA", usecols=range(4,21), names=names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
-        data = pd.Series(train + test)
+        data = train + test
+        data = [[d.iloc[260 * x:260 * (x + 1),:] for x in range(d.shape[0] // 260)] for d in data]
         if combine:
-            data = pd.Series([pd.concat(data.values)])
-        data = pd.Series([pd.Series([s]) for s in data])
-        if points:
-            data = pd.Series([pd.Series([d.iloc[0].iloc[260 * x:260 * (x + 1),:] for x in range(d.iloc[0].shape[0] // 260)]) for d in data])
+            data = [x for y in data for x in y]
         return data
     @staticmethod
     def xySplit(data):
@@ -40,8 +38,8 @@ class fNIRLib:
         :return: Type of |Series(Series(DataFrame(2D)))| shape: (Subjects, Reading/Task, (Time Steps, Features))
         '''
         split_data = [(y.iloc[:,:-1], y.iloc[0,-1]) for y in data]
-        x_data = pd.Series([y[0] for y in split_data])
-        y_data = pd.Series([y[1] for y in split_data])
+        x_data = [y[0] for y in split_data]
+        y_data = [y[1] for y in split_data]
         return x_data, y_data
     @staticmethod
     def minMaxScale(data):
