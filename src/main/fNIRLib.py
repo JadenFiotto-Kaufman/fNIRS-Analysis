@@ -73,8 +73,8 @@ class fNIRLib:
         '''
         random.seed(seed)
         n = features.shape[0]
-        index = random.rand(n) < size
-        return features[~index], features[index], classes[~index], classes[index]
+        index = random.choice(range(n),replace=False, size=int(n * size))
+        return features.iloc[index], features.drop(index), classes.iloc[index], classes.drop(index)
 
 
 

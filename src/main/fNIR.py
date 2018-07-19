@@ -1,5 +1,5 @@
 from sklearn.preprocessing import StandardScaler
-from sklearn import svm, ensemble
+from sklearn import svm, ensemble, preprocessing
 from keras.layers import LSTM, Conv1D
 from keras.layers import Dense, Flatten, TimeDistributed, MaxPooling1D, Dropout
 from keras.models import Sequential
@@ -10,7 +10,7 @@ from tsfresh import extract_relevant_features, feature_extraction
 from json import dump, load
 
 class fNIR:
-    seed = 10
+    seed = 11
     @staticmethod
     def tstag(features):
         tsdata = []
@@ -26,11 +26,11 @@ class fNIR:
         extracted_features = extract_relevant_features(ts_dataframe, classes, column_id="id", column_sort="time")
         extracted_features.to_pickle('tsfeatures.pkl')
         featureNames = feature_extraction.settings.from_columns(extracted_features)
-        with open("features_extracted", "w") as jsonFile:
+        with open("features_extracted.json", "w") as jsonFile:
             dump(featureNames, jsonFile)
         return True
     @staticmethod
-    def preprocess(filepath, combine=True, extract=False, test_size=.2):
+    def preprocess(filepath, combine=True, extract=False, test_size=.2, scale = True):
         data = fNIRLib.importData(filepath, combine=combine)
         features, classes = fNIRLib.xySplit(data)
         if extract:
@@ -45,16 +45,18 @@ class fNIR:
                 with open("features_extracted.json") as data_file:
                     featurenames = load(data_file)
                 features = fNIR.tstag(features)
-                features = feature_extraction.extract_features(features, default_fc_parameters=featurenames, column_id="id", column_sort="time")
-        xTrain, xTest, yTrain, yTest = fNIRLib.testTrain(features, classes, size=.2, seed=fNIR.seed)
+                features = feature_extraction.extract_features(features, kind_to_fc_parameters=featurenames, column_id="id", column_sort="time")
+        if scale:
+            scaler = preprocessing.StandardScaler()
+            features = pd.DataFrame(scaler.fit_transform(features), columns=list(features))
+        xTest, xTrain, yTest, yTrain = fNIRLib.testTrain(features, classes, size=test_size, seed=fNIR.seed)
         return {'xTest' : xTest,
                 'xTrain' : xTrain,
                 'yTrain' : yTrain,
                 'yTest' : yTest}
     @staticmethod
-    def neuralNet(model,data, epochs, batch_size, load,filepath = 'my_model_weights.hdf5' ):
+    def neuralNet(model,data, epochs, batch_size, load,filepath = 'my_model_weights.hdf5'):
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-
         checkpoint = ModelCheckpoint(filepath,
                                      monitor='val_acc',
                                      verbose=0,
@@ -65,18 +67,22 @@ class fNIR:
         model.fit(data['xTrain'], data['yTrain'], epochs=epochs, batch_size=batch_size, validation_data=[data['xTest'], data['yTest']], callbacks=[checkpoint],shuffle=True)
 
     @staticmethod
-    def train(filepath, method, epochs=5000, batch_size=3, combine=True, test_size=.2, load = False):
+    def train(filepath, method, epochs=5000, batch_size=3, combine=True, test_size=.2, load = False, scale = True):
         model = Sequential()
         if method == "DNN":
-            data = fNIR.preprocess(filepath, combine=combine, extract=True, test_size=.2)
+            data = fNIR.preprocess(filepath, combine=combine, extract=True, test_size=test_size, scale=scale)
             model.add(Dense(25, input_dim=data['xTrain'].shape[1], activation='relu'))
             model.add(Dropout(.5))
             model.add(Dense(20, activation='relu'))
             model.add(Dropout(.5))
+            model.add(Dense(15, activation='relu'))
+            model.add(Dropout(.5))
+            model.add(Dense(10, activation='relu'))
+            model.add(Dropout(.5))
             model.add(Dense(1, activation='sigmoid'))
             fNIR.neuralNet(model, data, epochs, batch_size, load)
         elif method == "LSTM":
-            data = fNIR.preprocess(filepath, combine=combine, extract=False, test_size=.2)
+            data = fNIR.preprocess(filepath, combine=combine, extract=False, test_size=test_size, scale=scale)
             data['xTrain'] = fNIRLib.to3D(data['xTrain'])
             data['xTest'] = fNIRLib.to3D(data['xTest'])
             model.add(Conv1D(50, kernel_size=3, activation='relu', input_shape=(data['xTrain'].shape[1:])))
@@ -91,7 +97,6 @@ class fNIR:
             clf.fit(data['xTrain'].values, data['yTrain'].values)
             z = clf.predict(data['xTest'].values)
             print(sum(z == data['yTest'])/len(data['yTest']))
-
         elif method == "RDF":
             data = fNIR.preprocess(filepath, combine=True, extract=True, test_size=.2)
             clf = ensemble.RandomForestClassifier(max_depth=2, random_state=fNIR.seed)
@@ -99,5 +104,3 @@ class fNIR:
             z = clf.predict(data['xTest'].values)
             print(sum(z == data['yTest']) / len(data['yTest']))
             pass
-
-fNIR.train("../../processed/", "DNN", epochs=5000, batch_size=3, combine=False, test_size=.2)
