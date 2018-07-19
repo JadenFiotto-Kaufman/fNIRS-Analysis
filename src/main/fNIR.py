@@ -1,7 +1,5 @@
-from sklearn.preprocessing import StandardScaler
 from sklearn import svm, ensemble, preprocessing
-from keras.layers import LSTM, Conv1D
-from keras.layers import Dense, Flatten, TimeDistributed, MaxPooling1D, Dropout
+from keras.layers import Dense, MaxPooling1D, Dropout, LSTM, Conv1D
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint
 from src.main.fNIRLib import fNIRLib
@@ -67,7 +65,7 @@ class fNIR:
         model.fit(data['xTrain'], data['yTrain'], epochs=epochs, batch_size=batch_size, validation_data=[data['xTest'], data['yTest']], callbacks=[checkpoint],shuffle=True)
 
     @staticmethod
-    def train(filepath, method, epochs=5000, batch_size=3, combine=True, test_size=.2, load = False, scale = True):
+    def train(filepath, method, epochs=5000, batch_size=3, combine=True, test_size=.2, load=False, scale=True):
         model = Sequential()
         if method == "DNN":
             data = fNIR.preprocess(filepath, combine=combine, extract=True, test_size=test_size, scale=scale)
@@ -75,7 +73,7 @@ class fNIR:
             model.add(Dropout(.5))
             model.add(Dense(20, activation='relu'))
             model.add(Dropout(.5))
-            model.add(Dense(15, activation='relu'))
+            model.add(Dense(10, activation='relu'))
             model.add(Dropout(.5))
             model.add(Dense(10, activation='relu'))
             model.add(Dropout(.5))
