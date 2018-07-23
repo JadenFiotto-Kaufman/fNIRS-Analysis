@@ -11,13 +11,13 @@ class fNIR:
     seed = 11
     @staticmethod
     def tstag(features):
-        tsdata = []
+        ts_features = []
         for i, d in enumerate(features):
             length = d.shape[0]
             d['id'] = [i] * length
             d['time'] = range(length)
-            tsdata.append(d)
-        return pd.concat(tsdata)
+            ts_features.append(d)
+        return pd.concat(ts_features)
     @staticmethod
     def genFeatures(features, classes):
         ts_dataframe = fNIR.tstag(features)
