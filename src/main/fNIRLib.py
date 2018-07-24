@@ -6,12 +6,12 @@ import os
 
 class fNIRLib:
     tslength = 260
+    column_names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb",
+                 "b3HbO", "b3Hb", "b4HbO", "b4Hb", "Class"]
     @staticmethod
     def importSingleton(filename):
-        names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb",
-                 "b3HbO", "b3Hb", "b4HbO", "b4Hb", "Class"]
-        data = pd.read_csv(filename, usecols=range(4, 21), names=names)
-        data = pd.Series([data.iloc[260 * x:260 * (x + 1), :] for x in range(data.shape[0] // 260)])
+        data = pd.read_csv(filename, usecols=range(4, 21), names=fNIRLib.column_names)
+        data = pd.Series([data.iloc[fNIRLib.tslength * x:fNIRLib.tslength * (x + 1), :] for x in range(data.shape[0] // fNIRLib.tslength)])
         return data
     @staticmethod
     def importData(data_path, combine=False):
@@ -22,11 +22,10 @@ class fNIRLib:
         :param points: option to group each task into it's own data frame. This is every 260 time steps (recommended)
         :return: Type of |Series(Series(DataFrame(2D)))| shape: (Subjects, Reading/Task, (Time Steps, Features))
         '''
-        names = ["a1HbO", "a1Hb", "a2HbO", "a2Hb", "a3HbO", "a3Hb", "a4HbO", "a4Hb", "b1HbO", "b1Hb", "b2HbO", "b2Hb", "b3HbO", "b3Hb", "b4HbO", "b4Hb", "Class"]
-        train = [pd.read_csv(data_path + subject + "/TRAIN_DATA", usecols=range(4,21), names=names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
-        test = [pd.read_csv(data_path + subject + "/TEST_DATA", usecols=range(4,21), names=names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
+        train = [pd.read_csv(data_path + subject + "/TRAIN_DATA", usecols=range(4,21), names=fNIRLib.column_names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
+        test = [pd.read_csv(data_path + subject + "/TEST_DATA", usecols=range(4,21), names=fNIRLib.column_names) for subject in os.listdir(data_path) if subject != ".DS_Store"]
         data = train + test
-        data = [[d.iloc[260 * x:260 * (x + 1),:] for x in range(d.shape[0] // 260)] for d in data]
+        data = [[d.iloc[fNIRLib.tslength * x:fNIRLib.tslength * (x + 1),:] for x in range(d.shape[0] // fNIRLib.tslength)] for d in data]
         if combine:
             data = [x for y in data for x in y]
         else:
@@ -74,7 +73,7 @@ class fNIRLib:
         random.seed(seed)
         n = features.shape[0]
         index = random.choice(range(n),replace=False, size=int(n * size))
-        return features.iloc[index], features.drop(index), classes.iloc[index], classes.drop(index)
+        return features.iloc[index].values, features.drop(index).values, classes.iloc[index], classes.drop(index)
 
 
 
