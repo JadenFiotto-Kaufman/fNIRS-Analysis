@@ -2,7 +2,8 @@ import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from PyQt5.QtWidgets import QDialog, QApplication, QVBoxLayout, QHBoxLayout, QLabel, QAction, QMenuBar, QFileDialog
+from PyQt5.QtWidgets import QDialog, QApplication, QVBoxLayout, QHBoxLayout, QLabel, QAction, QMenuBar, QFileDialog, \
+    QTabWidget
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.patches import Rectangle
@@ -20,6 +21,19 @@ class Window(QDialog):
 
         with open('./features_extracted.json', 'r') as file:
             self.loaded_json_data = json.load(file)
+
+        self.figures = []
+        self.canvases = []
+
+        self.toolbars = []
+
+        self.brainStateLabels = []
+        self.accuracyLabels = []
+
+        self.axes = []
+        self.tabs = []
+
+        self.tabs = QTabWidget()
 
         # a figure instance to plot on
         self.figure = plt.figure()
@@ -94,20 +108,17 @@ class Window(QDialog):
             self.features = all_features.drop(all_features.columns[[16]], axis=1)
             self.plot()
 
-    def onclick(self, event):
+    def onclick(self, event, i):
         print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
               ('double' if event.dblclick else 'single', event.button,
                event.x, event.y, event.xdata, event.ydata))
-        if (event.button == 1):
+        if event.button == 1:
             self.figure.tight_layout()
             self.ax.patches.clear()
 
         if event.button == 3:
-            self.draw_rectangle(event.xdata, event.ydata)
+            self.draw_rectangle(event.xdata, i)
 
-            self.brainStateLabel.setText("Brain State: High")
-            self.accuracyLabel.setText("Prediction Accuracy: 75%")
-            QApplication.processEvents()
             x_point = int(round(event.xdata))
 
             ml_data = self.features.iloc[0:x_point]
@@ -122,7 +133,15 @@ class Window(QDialog):
 
             print(features_extracted)
 
-            print(self.model.predict_classes(features_extracted.values))
+            predicted_class = self.model.predict_classes(features_extracted.values)[0][0]
+
+            if predicted_class == 0:
+                self.brainStateLabel.setText("Brain State: Low")
+            else:
+
+                self.brainStateLabel.setText("Brain State: High")
+            self.accuracyLabel.setText("Prediction Accuracy: 75%")
+            QApplication.processEvents()
         self.canvas.draw()
 
     # def on_move(self, event):
@@ -134,7 +153,7 @@ class Window(QDialog):
     #         print('data coords %f %f' % (event.xdata, event.ydata))
     #     self.figure.tight_layout()
 
-    def draw_rectangle(self, x, y):
+    def draw_rectangle(self, x, i):
         self.ax.patches.clear()
         rectangle = Rectangle((0, -10), width=x, height=100, color='#0F0F0F2F')
         self.ax.add_patch(rectangle)
