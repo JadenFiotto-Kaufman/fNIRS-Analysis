@@ -40,12 +40,14 @@ class fNIR:
                 except:
                     fNIR.genFeatures(features, classes)
                     features = pd.read_pickle('tsfeatures.pkl')
+
             else:
                 featurenames = None
                 with open("features_extracted.json") as data_file:
                     featurenames = load(data_file)
                 features = fNIR.tstag(features)
                 features = feature_extraction.extract_features(features, kind_to_fc_parameters=featurenames, column_id="id", column_sort="time")
+            features = features.reindex(sorted(list(features)), axis=1)
         if scale:
             scaler = preprocessing.StandardScaler()
             features = pd.DataFrame(scaler.fit_transform(features), columns=list(features))
@@ -129,14 +131,16 @@ class fNIR:
 
         data = fNIRLib.importData("../../processed/", combine=True)
         features, classes = fNIRLib.xySplit(data)
-        features = pd.read_pickle('tsfeatures.pkl')
         correct = 0
         total = 0
-        for i,s in features.iterrows():
+        for i, feat in enumerate(features):
             total = total + 1
-            s = pd.DataFrame(s).transpose()
-            s = pd.DataFrame(scaler.transform(s), columns=list(s))
-            prediction = model.predict_classes(s.values)
+            feat['id'] = [0] * 260
+            feat['time'] = range(260)
+            feat = feature_extraction.extract_features(feat, kind_to_fc_parameters=featurenames, column_id="id",column_sort="time")
+            feat = pd.DataFrame(scaler.transform(feat), columns=list(feat))
+            prediction = model.predict_classes(feat)
+
             if prediction[0] == classes[i]:
                 correct = correct+1
         print(total)
