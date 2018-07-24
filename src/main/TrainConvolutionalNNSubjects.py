@@ -40,5 +40,7 @@ model.compile(loss='binary_crossentropy',
 
 model.fit(xTrain, yTrain, batch_size=16, epochs=500)
 
+model.predict_classes()
+
 scores = model.evaluate(xTrain, yTrain, verbose=0)
 print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
