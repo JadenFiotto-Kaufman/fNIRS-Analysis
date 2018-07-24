@@ -30,7 +30,7 @@ class Window(QDialog):
 
         self.toolbars = []
 
-        #should've made this bottom bar not be per-tab, rather one and its get updated
+        # should've made this bottom bar not be per-tab, rather one and its get updated
         self.brainStateLabels = []
         self.pointClickedLabels = []
         self.predictAllButtons = []
@@ -67,6 +67,69 @@ class Window(QDialog):
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.tab_widget)
         self.setLayout(main_layout)
+
+    def createTab(self, i):
+        self.tabsList.append(QWidget())
+
+        # a figure instance to plot on
+        self.figures.append(plt.figure())
+
+        # this is the Canvas Widget that displays the plot or (figure)
+        self.canvases.append(FigureCanvas(self.figures[i]))
+
+        # this is the Navigation Toolbar for the top of the plot
+        self.toolbars.append(NavigationToolbar(self.canvases[i], self))
+
+        # create the layout and menu
+        layout = QVBoxLayout()
+
+        layout.setMenuBar(self.menu_bar)
+        layout.addWidget(self.toolbars[i])
+
+        layout.addWidget(self.canvases[i])
+
+        outputHBox = QHBoxLayout()
+
+        # create the labels that we will need to access again
+        self.brainStateLabels.append(QLabel("Brain State : "))
+        self.brainStateLabels[i].setFixedSize(200, 20)
+
+        self.pointClickedLabels.append(QLabel(""))
+        self.pointClickedLabels[i].setFixedSize(400, 20)
+
+        predictButton = QPushButton("Predict on All Data", self)
+        predictButton.setToolTip('Predicts on all data (Time = Max)')
+
+        predictButton.clicked.connect(self.predictOnAll)
+        predictButton.setFixedSize(200, 25)
+
+        self.predictAllButtons.append(predictButton)
+
+        predictionStatisticsVBoxLeft = QVBoxLayout()
+        predictionStatisticsVBoxLeft.addWidget(self.brainStateLabels[i])
+
+        predictionStatisticsVBoxMiddle = QVBoxLayout()
+        predictionStatisticsVBoxMiddle.addWidget(self.pointClickedLabels[i])
+
+        predictionStatisticsVBoxRight = QVBoxLayout()
+        predictionStatisticsVBoxRight.addWidget(self.predictAllButtons[i])
+
+        outputHBox.addLayout(predictionStatisticsVBoxLeft)
+        outputHBox.addLayout(predictionStatisticsVBoxMiddle)
+        outputHBox.addLayout(predictionStatisticsVBoxRight)
+
+        layout.addLayout(outputHBox)
+        self.tabsList[i].setLayout(layout)
+
+        # add the new tab to the widget
+        self.tab_widget.addTab(self.tabsList[i], "Task " + str(i + 1))
+
+        # motion_event_id = self.canvas.mpl_connect('motion_notify_event', self.on_move) #TODO IF A ON_MOUSE_MOVE EVENT IS NEEDED
+        # press_event_id = self.canvases[i].mpl_connect('button_press_event', lambda event: self.onclick(event, i))
+        # plot the data on the i'th tab
+        self.plot(i)
+
+        self.tabsList[i].setLayout(layout)
 
     def openFileDialog(self):
         options = QFileDialog.Options()
@@ -105,71 +168,11 @@ class Window(QDialog):
 
             # from 0-19, get the 20 tasks and make new tabs for each
             for i in range(0, int(len(self.features) / 260)):
-                self.tabsList.append(QWidget())
-
-                # a figure instance to plot on
-                self.figures.append(plt.figure())
-
-                # this is the Canvas Widget that displays the plot or (figure)
-                self.canvases.append(FigureCanvas(self.figures[i]))
-
-                # this is the Navigation Toolbar for the top of the plot
-                self.toolbars.append(NavigationToolbar(self.canvases[i], self))
-
-                # create the layout and menu
-                layout = QVBoxLayout()
-
-                layout.setMenuBar(self.menu_bar)
-                layout.addWidget(self.toolbars[i])
-
-                layout.addWidget(self.canvases[i])
-
-                outputHBox = QHBoxLayout()
-
-                # create the labels that we will need to access again
-                self.brainStateLabels.append(QLabel("Brain State : "))
-                self.brainStateLabels[i].setFixedSize(200, 20)
-
-                self.pointClickedLabels.append(QLabel(""))
-                self.pointClickedLabels[i].setFixedSize(400, 20)
-
-                predictButton = QPushButton("Predict on All Data", self)
-                predictButton.setToolTip('Predicts on all data (Time = Max)')
-
-                predictButton.clicked.connect(self.predictOnAll)
-                predictButton.setFixedSize(200, 25)
-
-                self.predictAllButtons.append(predictButton)
-
-                predictionStatisticsVBoxLeft = QVBoxLayout()
-                predictionStatisticsVBoxLeft.addWidget(self.brainStateLabels[i])
-
-                predictionStatisticsVBoxMiddle = QVBoxLayout()
-                predictionStatisticsVBoxMiddle.addWidget(self.pointClickedLabels[i])
-
-                predictionStatisticsVBoxRight = QVBoxLayout()
-                predictionStatisticsVBoxRight.addWidget(self.predictAllButtons[i])
-
-                outputHBox.addLayout(predictionStatisticsVBoxLeft)
-                outputHBox.addLayout(predictionStatisticsVBoxMiddle)
-                outputHBox.addLayout(predictionStatisticsVBoxRight)
-
-                layout.addLayout(outputHBox)
-                self.tabsList[i].setLayout(layout)
-
-                # add the new tab to the widget
-                self.tab_widget.addTab(self.tabsList[i], "Task " + str(i + 1))
-
-                # motion_event_id = self.canvas.mpl_connect('motion_notify_event', self.on_move) #TODO IF A ON_MOUSE_MOVE EVENT IS NEEDED
-
-                # plot the data on the i'th tab
-                self.plot(i)
-
-                self.tabsList[i].setLayout(layout)
+                self.createTab(i)
 
             # connect the mouse button to the canvas (for the event) just for the first tab
             # every other tab, when you click on one it connects the tabs canvas to your mouse
-            press_event_id = self.canvases[0].mpl_connect('button_press_event', lambda event: self.onclick(event, i))
+
             self.setWindowTitle("fNIRS Analysis (%s)" % file_path)
 
     def onclick(self, event, i):
@@ -236,10 +239,11 @@ class Window(QDialog):
 
         # self.axes[i].set_aspect('auto')
 
-        self.axes[i].plot(self.features.iloc[i * 260: (i + 1) * 260], '-') #TODO this may need to be dynamic if the data isnt evenly divisible by 260
+        self.axes[i].plot(self.features.iloc[i * 260: (i + 1) * 260],
+                          '-')  # TODO this may need to be dynamic if the data isnt evenly divisible by 260
 
         self.axes[i].set_ylabel('Oxygenation or De-Oxygenation Level')
-        self.axes[i].set_xlabel('Time (seconds)')
+        self.axes[i].set_xlabel('Time Step')
 
         self.axes[i].legend(self.axes[i].get_lines(), self.features.columns, bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
                             ncol=8, mode="expand", borderaxespad=0.)
@@ -270,6 +274,10 @@ class Window(QDialog):
         self.pointClickedLabels[i].setText("Clicked on Time = %s" % x_point)
         self.pointClickedLabels[i].update()
         self.brainStateLabels[i].update()
+
+        self.axes[i].patches.clear()
+
+        self.canvases[i].draw()
 
 
 if __name__ == '__main__':
