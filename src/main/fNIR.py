@@ -1,7 +1,7 @@
 from sklearn import svm, ensemble, preprocessing
 from sklearn.externals import joblib
 from keras.layers import Dense, MaxPooling1D, Dropout, LSTM, Conv1D
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.callbacks import ModelCheckpoint
 from src.main.fNIRLib import fNIRLib
 import pandas as pd
@@ -197,4 +197,15 @@ class fNIR:
         print(totalE)
         print(totalD)
 
+    @staticmethod
+    def load_model():
+        json_file = open('../../results/models/model_num.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+
+        loaded_model = model_from_json(loaded_model_json)
+
+        loaded_model.load_weights("../../results/models/25_20.hdf5")
+
+        return loaded_model
 
