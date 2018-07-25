@@ -146,7 +146,7 @@ class fNIR:
         print(total)
         print(correct)
     @staticmethod
-    def predict(weight_path='my_model_weights.hdf5'):
+    def predict(filepath, weight_path='my_model_weights.hdf5'):
 
         featurenames = None
         with open("features_extracted.json") as data_file:
@@ -167,34 +167,15 @@ class fNIR:
         model.add(Dense(1, activation='sigmoid'))
 
         model.load_weights(weight_path)
+        data = pd.read_csv(filepath, usecols=range(4, 21), names=fNIRLib.column_names)
+        data = data.tail(260)
+        features, classes = (data.iloc[:, :-1], data.iloc[0, -1])
+        features['id'] = [999] * 260
+        features['time'] = range(260)
+        features = feature_extraction.extract_features(features, kind_to_fc_parameters=featurenames, column_id="id",column_sort="time")
+        features = pd.DataFrame(scaler.transform(features), columns=list(features))
+        prediction = model.predict_classes(features)
 
-        totalD = 0
-        totalE = 0
-        for subject in os.listdir("../../OUT"):
-
-            data = pd.read_csv("../../OUT/" + subject + "/UNSEEN_D", usecols=range(4, 21), names=fNIRLib.column_names)
-            data = data.tail(260)
-            features, classes = (data.iloc[:, :-1], data.iloc[0, -1])
-            features['id'] = [999] * 260
-            features['time'] = range(260)
-            features = feature_extraction.extract_features(features, kind_to_fc_parameters=featurenames, column_id="id",column_sort="time")
-            features = pd.DataFrame(scaler.transform(features), columns=list(features))
-            prediction = model.predict_classes(features)
-            if prediction[0] == classes:
-                totalD = totalD + 1
-
-            data = pd.read_csv("../../OUT/" + subject + "/UNSEEN_E", usecols=range(4, 21), names=fNIRLib.column_names)
-            data = data.tail(260)
-            features, classes = (data.iloc[:, :-1], data.iloc[0, -1])
-            features['id'] = [999] * 260
-            features['time'] = range(260)
-            features = feature_extraction.extract_features(features, kind_to_fc_parameters=featurenames, column_id="id",
-                                                           column_sort="time")
-            features = pd.DataFrame(scaler.transform(features), columns=list(features))
-            prediction = model.predict_classes(features)
-            if prediction[0] == classes:
-                totalE = totalE + 1
-        print(totalE)
-        print(totalD)
+        print(prediction[0][0])
 
 
